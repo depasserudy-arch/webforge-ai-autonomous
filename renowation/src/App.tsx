@@ -5,6 +5,7 @@ import Home from './pages/Home'
 import Realisations from './pages/Realisations'
 import Devis from './pages/Devis'
 import Cockpit from './pages/Cockpit'
+import OffrePublique from './pages/OffrePublique'
 import NotFound from './pages/NotFound'
 import { Confidentialite, MentionsLegales } from './pages/Legal'
 
@@ -18,6 +19,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/cockpit" element={<Cockpit />} />
+      <Route path="/offre/:jeton" element={<OffrePublique />} />
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="/realisations" element={<Realisations />} />

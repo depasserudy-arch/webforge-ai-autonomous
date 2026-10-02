@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Download, Lock, LogOut, Mail, MessageCircle, Phone, RefreshCw } from 'lucide-react'
+import { Download, FolderOpen, Lock, LogOut, Mail, MessageCircle, Phone, Receipt, RefreshCw } from 'lucide-react'
+import Dossier from '../components/Dossier'
 import { Logo } from '../components/Layout'
 import { services } from '../data/company'
 import { authMode, backend, eur, isSignedIn, listLeads, signIn, signOut, STATUSES, updateLead, type Lead, type LeadStatus } from '../lib/leads'
+import { listCommission, listEncaissements, listOffres, type Encaissement, type LigneCommission, type Offre } from '../lib/offres'
 
-const COMMISSION = 0.1 // modèle ALSA : 10 % du chiffre d'affaires signé
 const serviceLabel = (id: string) => services.find((s) => s.id === id)?.title ?? id
 const date = (iso: string) => new Date(iso).toLocaleDateString('fr-BE', { day: '2-digit', month: 'short' })
 
@@ -51,11 +52,19 @@ function Login({ onDone }: { onDone: () => void }) {
 export default function Cockpit() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
+  const [offres, setOffres] = useState<Offre[]>([])
+  const [encaissements, setEncaissements] = useState<Encaissement[]>([])
+  const [journal, setJournal] = useState<LigneCommission[]>([])
+  const [ouvert, setOuvert] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const refresh = useCallback(async () => {
     try {
-      setLeads(await listLeads())
+      const [l, o, e, j] = await Promise.all([listLeads(), listOffres(), listEncaissements(), listCommission()])
+      setLeads(l)
+      setOffres(o)
+      setEncaissements(e)
+      setJournal(j)
       setError('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement')
@@ -69,19 +78,20 @@ export default function Cockpit() {
     if (authed) refresh()
   }, [authed, refresh])
 
+  // CA signé = offres signées en ligne ; commission = journal tenu en base, sur l'encaissé.
   const kpi = useMemo(() => {
     const active = leads.filter((l) => !['signe', 'perdu'].includes(l.status))
     const signed = leads.filter((l) => l.status === 'signe')
     const closed = leads.filter((l) => ['signe', 'perdu'].includes(l.status)).length
-    const ca = signed.reduce((s, l) => s + (l.amount_signed ?? 0), 0)
     return {
       total: leads.length,
       pipeline: active.reduce((s, l) => s + (l.budget_low + l.budget_high) / 2, 0),
-      ca,
-      commission: ca * COMMISSION,
+      ca: offres.filter((o) => o.statut === 'signee').reduce((s, o) => s + o.montant_htva, 0),
+      encaisse: encaissements.reduce((s, e) => s + e.montant, 0),
+      commission: journal.reduce((s, j) => s + j.commission, 0),
       conversion: closed ? Math.round((signed.length / closed) * 100) : 0,
     }
-  }, [leads])
+  }, [leads, offres, encaissements, journal])
 
   async function move(lead: Lead, status: LeadStatus) {
     let amount_signed = lead.amount_signed
@@ -111,15 +121,17 @@ export default function Cockpit() {
     }
   }
 
-  function exportCsv() {
-    const cols: (keyof Lead)[] = ['created_at', 'name', 'phone', 'email', 'city', 'service', 'surface', 'timing', 'budget_low', 'budget_high', 'status', 'amount_signed', 'message', 'notes']
+  function csv<T>(rows: T[], cols: (keyof T)[], nom: string) {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const csv = [cols.join(';'), ...leads.map((l) => cols.map((c) => esc(l[c])).join(';'))].join('\n')
+    const body = [cols.join(';'), ...rows.map((r) => cols.map((c) => esc(r[c])).join(';'))].join('\n')
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `renowation-leads-${new Date().toISOString().slice(0, 10)}.csv`
+    a.href = URL.createObjectURL(new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' }))
+    a.download = `renowation-${nom}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
+  const exportCsv = () =>
+    csv(leads, ['created_at', 'name', 'phone', 'email', 'city', 'service', 'surface', 'timing', 'budget_low', 'budget_high', 'status', 'amount_signed', 'message', 'notes'], 'leads')
+  const exportCommission = () => csv(journal, ['encaisse_le', 'reference', 'montant_encaisse', 'taux', 'commission'], 'commission')
 
   if (authed === null) return null
   if (!authed) return <Login onDone={() => setAuthed(true)} />
@@ -127,8 +139,9 @@ export default function Cockpit() {
   const tiles = [
     { label: 'Demandes reçues', value: String(kpi.total) },
     { label: 'Pipeline en cours', value: eur(kpi.pipeline) },
-    { label: 'CA signé', value: eur(kpi.ca) },
-    { label: 'Commission ALSA (10 %)', value: eur(kpi.commission), accent: true },
+    { label: 'CA signé (HTVA)', value: eur(kpi.ca) },
+    { label: 'Encaissé', value: eur(kpi.encaisse) },
+    { label: 'Commission ALSA (sur encaissé)', value: eur(kpi.commission), accent: true },
     { label: 'Taux de closing', value: `${kpi.conversion} %` },
   ]
 
@@ -143,7 +156,8 @@ export default function Cockpit() {
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden text-ink-muted md:inline">Données : {backend}</span>
             <button onClick={refresh} className="btn !px-3 hover:bg-sand" aria-label="Actualiser"><RefreshCw className="h-4 w-4" /></button>
-            <button onClick={exportCsv} className="btn !px-3 hover:bg-sand" aria-label="Exporter CSV"><Download className="h-4 w-4" /></button>
+            <button onClick={exportCsv} className="btn !px-3 hover:bg-sand" aria-label="Exporter les leads (CSV)" title="Exporter les leads"><Download className="h-4 w-4" /></button>
+            <button onClick={exportCommission} className="btn !px-3 hover:bg-sand" aria-label="Exporter le journal de commission (CSV)" title="Journal de commission"><Receipt className="h-4 w-4" /></button>
             <button onClick={() => signOut().then(() => setAuthed(false))} className="btn !px-3 hover:bg-sand" aria-label="Déconnexion"><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
@@ -152,7 +166,7 @@ export default function Cockpit() {
       <main className="container-x py-8">
         {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {tiles.map((t) => (
             <div key={t.label} className={`rounded-2xl p-5 ${t.accent ? 'bg-ink text-white' : 'bg-white'}`}>
               <p className={`text-xs font-medium ${t.accent ? 'text-brass-light' : 'text-ink-muted'}`}>{t.label}</p>
@@ -179,7 +193,7 @@ export default function Cockpit() {
                     {col.map((l) => (
                       <article key={l.id} className="rounded-xl bg-white p-4 text-sm shadow-sm">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold">{l.name}</p>
+                          <button onClick={() => setOuvert(l.id)} className="text-left font-semibold hover:text-brass">{l.name}</button>
                           <span className="text-xs text-ink-muted">{date(l.created_at)}</span>
                         </div>
                         <p className="mt-1 text-ink-muted">{serviceLabel(l.service)} · {l.surface} m² · {l.city}</p>
@@ -201,6 +215,7 @@ export default function Cockpit() {
                           <a href={`tel:${l.phone}`} className="rounded-lg p-2 hover:bg-sand" aria-label="Appeler"><Phone className="h-4 w-4" /></a>
                           <a href={`https://wa.me/${l.phone.replace(/[^\d]/g, '').replace(/^0/, '32')}`} target="_blank" rel="noreferrer" className="rounded-lg p-2 hover:bg-sand" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></a>
                           <a href={`mailto:${l.email}?subject=${encodeURIComponent('Votre projet de rénovation – Renowation')}`} className="rounded-lg p-2 hover:bg-sand" aria-label="E-mail"><Mail className="h-4 w-4" /></a>
+                          <button onClick={() => setOuvert(l.id)} className="rounded-lg p-2 hover:bg-sand" aria-label={`Ouvrir le dossier de ${l.name}`} title="Dossier, offres, encaissements"><FolderOpen className="h-4 w-4" /></button>
                           <select
                             value={l.status}
                             onChange={(e) => move(l, e.target.value as LeadStatus)}
@@ -219,6 +234,19 @@ export default function Cockpit() {
           </div>
         )}
       </main>
+
+      {ouvert && leads.find((l) => l.id === ouvert) && (
+        <Dossier
+          lead={leads.find((l) => l.id === ouvert)!}
+          offres={offres.filter((o) => o.lead_id === ouvert)}
+          encaissements={encaissements}
+          onClose={() => setOuvert(null)}
+          onChange={(err) => {
+            if (err) setError(err)
+            refresh().then(() => err && setError(err))
+          }}
+        />
+      )}
     </div>
   )
 }

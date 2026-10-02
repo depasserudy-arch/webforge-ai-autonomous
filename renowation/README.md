@@ -8,7 +8,9 @@ Site vitrine haut de gamme + tunnel de devis + cockpit commercial pour **Renowat
 | `/` | Accueil : hero, 7 expertises, mosaïque réalisations, méthode en 5 étapes, zone d’intervention, CTA |
 | `/realisations` | Galerie filtrable par catégorie + lightbox (clavier ← → Échap) |
 | `/devis` | Simulateur en 3 étapes (travaux → surface/finition/délai → coordonnées) avec fourchette de prix en direct |
-| `/cockpit` | Cockpit ALSA : KPI (pipeline, CA signé, **commission 10 %**, taux de closing), pipeline en 6 colonnes, notes de suivi, appel / WhatsApp / e-mail en un clic, export CSV |
+| `/cockpit` | Cockpit ALSA : KPI (pipeline, CA signé, encaissé, **commission 10 % sur l’encaissé**, taux de closing), pipeline en 6 colonnes, notes, export leads + journal de commission (CSV) |
+| Dossier client (cockpit) | Offres chiffrées ligne par ligne (TVA 6/21 %), envoi par lien, suivi des encaissements, photos & documents de chantier |
+| `/offre/:jeton` | Offre consultable et **signable en ligne** par le client (signature manuscrite, copie figée + empreinte SHA-256), imprimable en PDF |
 | `/mentions-legales`, `/confidentialite` | Pages légales belges / RGPD |
 
 Stack : Vite · React 19 · TypeScript · Tailwind · Supabase (optionnel).
@@ -73,13 +75,41 @@ Tout le code est prêt ; il suffit de le brancher sur un projet Supabase.
    Puis *Database → Webhooks → Create* : table `renowation_leads`, événement `INSERT`,
    type *Supabase Edge Function* `notify-lead`, en-tête `x-webhook-secret: <même chaîne>`.
 
-### Sécurité (testée sur PostgreSQL)
+6. **Remontée vers ALSA COCKPIT** (même contrat que Dream Bed) :
+   ```sql
+   insert into public.pont_config values
+     ('plateforme', 'renowation'),
+     ('url_cockpit', 'https://<cockpit>/ingest'),
+     ('cle_ingest', '<secret partagé avec le cockpit>');
+   ```
+   Événements envoyés, signés HMAC-SHA256 (en-tête `x-signature`) : `devis.signe` et
+   `paiement.encaisse`. Sans configuration, rien n'est envoyé et rien n'est bloqué.
+
+## Du devis à la commission
+
+```
+Demande site ─► Dossier ─► Offre (brouillon) ─► Envoyée (lien secret) ─► Signée par le client
+                                                                             │
+                                  journal_commission ◄─ Encaissement(s) ◄────┘
+                                  (10 %, en base)          │
+                                         └──────► ALSA COCKPIT (paiement.encaisse)
+```
+
+- **Totaux calculés en base** (jamais confiés au navigateur) ; offre **gelée** dès l'envoi.
+- **Seul le client signe**, via son lien : l'équipe ne peut pas marquer une offre « signée ».
+- **Commission sur l'encaissé**, écrite par la base dans `journal_commission` (lecture seule).
+- Encaissements **non modifiables / non supprimables** : correction par montant négatif.
+- Taux de commission : table `parametres` (`taux_commission`, défaut `0.10`).
+- Frein anti-abus : 3 demandes / 10 min par e-mail ou téléphone, 20 / min au total.
+
+### Sécurité (testée sur PostgreSQL — 27 scénarios)
 
 | Qui | Créer une demande | Lire les demandes | Modifier statut / montant / notes |
 |---|---|---|---|
 | Visiteur du site | ✅ (statut « nouveau » uniquement) | ❌ | ❌ |
 | Compte connecté hors équipe | ✅ | ❌ (0 ligne) | ❌ |
 | Membre de `team_members` | ✅ | ✅ | ✅ |
+| Client avec le lien d'offre | — | Son offre uniquement | Signer (une seule fois) |
 
 Contrôles en base : format e-mail, longueurs maximales, services autorisés, montants positifs.
 Le formulaire contient aussi un champ piège anti-robots.

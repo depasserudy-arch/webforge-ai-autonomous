@@ -34,7 +34,7 @@ export type NewLead = Omit<Lead, 'id' | 'created_at' | 'status' | 'amount_signed
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null
+export const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null
 export const backend = supabase ? 'Supabase' : 'Local (navigateur)'
 
 const LS_KEY = 'renowation.leads'
