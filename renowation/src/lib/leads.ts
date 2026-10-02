@@ -27,9 +27,10 @@ export interface Lead {
   message: string
   status: LeadStatus
   amount_signed: number | null
+  notes: string
 }
 
-export type NewLead = Omit<Lead, 'id' | 'created_at' | 'status' | 'amount_signed'>
+export type NewLead = Omit<Lead, 'id' | 'created_at' | 'status' | 'amount_signed' | 'notes'>
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -62,6 +63,7 @@ export async function createLead(input: NewLead): Promise<void> {
     created_at: new Date().toISOString(),
     status: 'nouveau',
     amount_signed: null,
+    notes: '',
   }
   writeLocal([lead, ...readLocal()])
 }
@@ -78,7 +80,7 @@ export async function listLeads(): Promise<Lead[]> {
   return readLocal()
 }
 
-export async function updateLead(id: string, patch: Partial<Pick<Lead, 'status' | 'amount_signed'>>) {
+export async function updateLead(id: string, patch: Partial<Pick<Lead, 'status' | 'amount_signed' | 'notes'>>) {
   if (supabase) {
     const { error } = await supabase.from('renowation_leads').update(patch).eq('id', id)
     if (error) throw error
@@ -99,7 +101,12 @@ export const authMode: 'supabase' | 'pin' = supabase ? 'supabase' : 'pin'
 export async function signIn(login: string, secret: string): Promise<void> {
   if (supabase) {
     const { error } = await supabase.auth.signInWithPassword({ email: login, password: secret })
-    if (error) throw error
+    if (error) throw new Error('Identifiants incorrects')
+    const { data: allowed } = await supabase.rpc('is_team_member')
+    if (!allowed) {
+      await supabase.auth.signOut()
+      throw new Error('Ce compte n’a pas accès au cockpit')
+    }
     return
   }
   const pin = (import.meta.env.VITE_COCKPIT_PIN as string | undefined) || '2026'

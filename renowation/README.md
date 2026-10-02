@@ -8,7 +8,8 @@ Site vitrine haut de gamme + tunnel de devis + cockpit commercial pour **Renowat
 | `/` | Accueil : hero, 7 expertises, mosaïque réalisations, méthode en 5 étapes, zone d’intervention, CTA |
 | `/realisations` | Galerie filtrable par catégorie + lightbox (clavier ← → Échap) |
 | `/devis` | Simulateur en 3 étapes (travaux → surface/finition/délai → coordonnées) avec fourchette de prix en direct |
-| `/cockpit` | Cockpit ALSA : KPI (pipeline, CA signé, **commission 10 %**, taux de closing), pipeline en 6 colonnes, appel / WhatsApp / e-mail en un clic, export CSV |
+| `/cockpit` | Cockpit ALSA : KPI (pipeline, CA signé, **commission 10 %**, taux de closing), pipeline en 6 colonnes, notes de suivi, appel / WhatsApp / e-mail en un clic, export CSV |
+| `/mentions-legales`, `/confidentialite` | Pages légales belges / RGPD |
 
 Stack : Vite · React 19 · TypeScript · Tailwind · Supabase (optionnel).
 
@@ -40,21 +41,62 @@ Ajout manuel : déposer les fichiers dans `public/photos/` et les déclarer dans
 
 Tant qu’aucune photo n’est importée, la plateforme affiche des visuels de remplacement soignés.
 
-## Données des leads
+## Mise en production sur Supabase
 
-- **Sans configuration** : les demandes sont stockées dans le navigateur (démo).
-  Code d’accès cockpit : `VITE_COCKPIT_PIN` (défaut `2026`).
-- **Production (Supabase)** : exécuter `supabase/schema.sql`, créer les comptes de
-  l’équipe dans Supabase Auth, puis renseigner `.env` (voir `.env.example`).
-  Le public ne peut qu’**insérer** une demande (RLS) ; lecture et mise à jour sont
-  réservées aux utilisateurs connectés.
+Tout le code est prêt ; il suffit de le brancher sur un projet Supabase.
 
-## Déploiement
+1. **Créer le projet** sur https://supabase.com/dashboard → *New project* → nom `RENOWATION`,
+   région *Central EU (Frankfurt)*.
+2. **Créer la base** (table des demandes + sécurité) :
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <REF_DU_PROJET>
+   npx supabase db push
+   ```
+   (ou coller `supabase/migrations/20261002000000_renowation_init.sql` dans le *SQL Editor*).
+3. **Donner l'accès au cockpit** — pour chaque membre de l'équipe :
+   ```sql
+   insert into public.team_members (email, role) values ('prenom@domaine.be', 'admin');
+   ```
+   puis *Authentication → Users → Invite user* avec la même adresse. Les inscriptions libres
+   sont désactivées : seule une adresse présente dans `team_members` entre dans le cockpit.
+4. **Brancher le site** : copier `.env.example` en `.env` et renseigner `VITE_SUPABASE_URL` et
+   `VITE_SUPABASE_ANON_KEY` (*Project Settings → API*). Sur Vercel : mêmes variables dans
+   *Settings → Environment Variables*.
+5. **Alerte e-mail à chaque devis** (optionnel, recommandé) :
+   ```bash
+   npx supabase secrets set RESEND_API_KEY=... WEBHOOK_SECRET=<chaîne aléatoire> \
+     NOTIFY_TO=info@renowation.be NOTIFY_FROM="Renowation <devis@renowation.be>" \
+     COCKPIT_URL=https://renowation.be/cockpit
+   npx supabase functions deploy notify-lead
+   ```
+   Puis *Database → Webhooks → Create* : table `renowation_leads`, événement `INSERT`,
+   type *Supabase Edge Function* `notify-lead`, en-tête `x-webhook-secret: <même chaîne>`.
 
-`npm run build` → `dist/`. `vercel.json` inclut la réécriture SPA.
+### Sécurité (testée sur PostgreSQL)
+
+| Qui | Créer une demande | Lire les demandes | Modifier statut / montant / notes |
+|---|---|---|---|
+| Visiteur du site | ✅ (statut « nouveau » uniquement) | ❌ | ❌ |
+| Compte connecté hors équipe | ✅ | ❌ (0 ligne) | ❌ |
+| Membre de `team_members` | ✅ | ✅ | ✅ |
+
+Contrôles en base : format e-mail, longueurs maximales, services autorisés, montants positifs.
+Le formulaire contient aussi un champ piège anti-robots.
+
+### Mode démo (sans Supabase)
+
+Sans variables d'environnement, les demandes restent dans le navigateur et le cockpit
+s'ouvre avec le code `VITE_COCKPIT_PIN` (défaut `2026`). À réserver aux démonstrations.
+
+## Pages légales
+
+`/mentions-legales` et `/confidentialite` (RGPD : finalités, destinataires dont ALSA
+Consulting, durée de conservation, droits, APD). Compléter la forme juridique et le
+numéro BCE/TVA dans `src/data/company.ts` (`legalForm`, `vat`).
 
 ## À valider avec le client avant mise en ligne
 
 - Liste des services, fourchettes de prix du simulateur (`src/data/company.ts`)
-- Communes desservies, numéro de TVA, mentions légales / politique RGPD
+- Forme juridique et numéro BCE/TVA (`legalForm`, `vat`)
 - Textes et légendes des photos importées

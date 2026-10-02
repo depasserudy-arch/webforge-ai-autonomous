@@ -21,7 +21,7 @@ export default function Devis() {
   const [surface, setSurface] = useState(40)
   const [level, setLevel] = useState<(typeof levels)[number]['id']>('confort')
   const [timing, setTiming] = useState(timings[1])
-  const [form, setForm] = useState({ name: '', email: '', phone: '', city: '', message: '', consent: false })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', city: '', message: '', consent: false, website: '' })
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
 
   const svc = services.find((s) => s.id === service)
@@ -36,6 +36,8 @@ export default function Devis() {
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!svc || !estimate) return
+    // Champ piège invisible : rempli uniquement par les robots.
+    if (form.website) return setStatus('done')
     setStatus('sending')
     try {
       await createLead({
@@ -137,16 +139,29 @@ export default function Devis() {
         )}
 
         {step === 2 && (
-          <form onSubmit={submit} className="mt-10 grid gap-5 sm:grid-cols-2">
+          <form onSubmit={submit} className="relative mt-10 grid gap-5 sm:grid-cols-2">
             <h2 className="text-xl font-semibold sm:col-span-2">Où pouvons-nous vous recontacter ?</h2>
             <div><label className="label" htmlFor="name">Nom complet *</label><input id="name" required autoComplete="name" className="field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div><label className="label" htmlFor="phone">Téléphone *</label><input id="phone" required type="tel" autoComplete="tel" className="field" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
             <div><label className="label" htmlFor="email">E-mail *</label><input id="email" required type="email" autoComplete="email" className="field" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div><label className="label" htmlFor="city">Commune du chantier *</label><input id="city" required className="field" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
             <div className="sm:col-span-2"><label className="label" htmlFor="message">Votre projet en quelques mots</label><textarea id="message" rows={4} className="field" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute -left-[9999px] h-0 w-0 opacity-0"
+              value={form.website}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+            />
             <label className="flex items-start gap-3 text-sm text-ink-muted sm:col-span-2">
               <input type="checkbox" required checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 accent-brass" />
-              J’accepte que Renowation utilise ces données pour me recontacter au sujet de ma demande (RGPD).
+              <span>
+                J’accepte que Renowation utilise ces données pour me recontacter au sujet de ma demande.{' '}
+                <Link to="/confidentialite" target="_blank" className="underline hover:text-brass">Politique de confidentialité</Link>
+              </span>
             </label>
             {status === 'error' && <p className="text-sm text-red-700 sm:col-span-2">Envoi impossible pour le moment. Appelez-nous au {company.phone}.</p>}
             <div className="flex justify-between sm:col-span-2">

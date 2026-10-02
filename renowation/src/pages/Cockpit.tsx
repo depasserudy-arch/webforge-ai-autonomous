@@ -100,8 +100,19 @@ export default function Cockpit() {
     }
   }
 
+  async function saveNotes(lead: Lead, notes: string) {
+    if (notes === (lead.notes ?? '')) return
+    setLeads((ls) => ls.map((l) => (l.id === lead.id ? { ...l, notes } : l)))
+    try {
+      await updateLead(lead.id, { notes })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Enregistrement impossible')
+      refresh()
+    }
+  }
+
   function exportCsv() {
-    const cols: (keyof Lead)[] = ['created_at', 'name', 'phone', 'email', 'city', 'service', 'surface', 'timing', 'budget_low', 'budget_high', 'status', 'amount_signed', 'message']
+    const cols: (keyof Lead)[] = ['created_at', 'name', 'phone', 'email', 'city', 'service', 'surface', 'timing', 'budget_low', 'budget_high', 'status', 'amount_signed', 'message', 'notes']
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const csv = [cols.join(';'), ...leads.map((l) => cols.map((c) => esc(l[c])).join(';'))].join('\n')
     const a = document.createElement('a')
@@ -177,6 +188,15 @@ export default function Cockpit() {
                         </p>
                         <p className="mt-1 text-xs text-ink-muted">{l.timing}</p>
                         {l.message && <p className="mt-2 line-clamp-3 text-xs text-ink-soft">{l.message}</p>}
+                        <textarea
+                          defaultValue={l.notes ?? ''}
+                          onBlur={(e) => saveNotes(l, e.target.value)}
+                          placeholder="Notes de suivi…"
+                          rows={2}
+                          maxLength={8000}
+                          className="mt-3 w-full resize-y rounded-lg border border-ink/10 bg-sand/60 px-2 py-1.5 text-xs focus:border-brass focus:outline-none"
+                          aria-label={`Notes sur ${l.name}`}
+                        />
                         <div className="mt-3 flex flex-wrap items-center gap-1">
                           <a href={`tel:${l.phone}`} className="rounded-lg p-2 hover:bg-sand" aria-label="Appeler"><Phone className="h-4 w-4" /></a>
                           <a href={`https://wa.me/${l.phone.replace(/[^\d]/g, '').replace(/^0/, '32')}`} target="_blank" rel="noreferrer" className="rounded-lg p-2 hover:bg-sand" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" /></a>

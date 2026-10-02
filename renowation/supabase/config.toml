@@ -1,0 +1,13 @@
+project_id = "renowation"
+
+[auth]
+site_url = "https://renowation.be"
+additional_redirect_urls = ["http://localhost:5173"]
+# Le cockpit est sur invitation : pas d'inscription libre.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+
+[functions.notify-lead]
+verify_jwt = false

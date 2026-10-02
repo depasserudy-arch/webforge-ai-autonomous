@@ -88,7 +88,11 @@ export default function Layout() {
         </div>
         <div className="border-t border-white/10">
           <div className="container-x flex flex-col gap-2 py-6 text-xs sm:flex-row sm:justify-between">
-            <p>© {YEAR} Renowation. Tous droits réservés.</p>
+            <p>
+              © {YEAR} Renowation. Tous droits réservés. ·{' '}
+              <Link to="/mentions-legales" className="hover:text-brass-light">Mentions légales</Link> ·{' '}
+              <Link to="/confidentialite" className="hover:text-brass-light">Confidentialité</Link>
+            </p>
             <p>Plateforme conçue par ALSA Consulting</p>
           </div>
         </div>

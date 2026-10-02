@@ -6,6 +6,7 @@ import Realisations from './pages/Realisations'
 import Devis from './pages/Devis'
 import Cockpit from './pages/Cockpit'
 import NotFound from './pages/NotFound'
+import { Confidentialite, MentionsLegales } from './pages/Legal'
 
 export default function App() {
   const { pathname, hash } = useLocation()
@@ -21,6 +22,8 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="/realisations" element={<Realisations />} />
         <Route path="/devis" element={<Devis />} />
+        <Route path="/mentions-legales" element={<MentionsLegales />} />
+        <Route path="/confidentialite" element={<Confidentialite />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

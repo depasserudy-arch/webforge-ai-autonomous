@@ -8,6 +8,12 @@ export const company = {
   address: 'Chaussée de Waterloo 200/8',
   city: '1640 Rhode-Saint-Genèse',
   facebook: 'https://www.facebook.com/Renowation.be/',
+  // Mentions légales — À COMPLÉTER avec les données BCE officielles du client.
+  legalName: 'Renowation',
+  legalForm: '',
+  vat: '',
+  hosting: 'Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis',
+  dataHosting: 'Supabase (serveurs Union européenne — Francfort)',
   zones: ['Rhode-Saint-Genèse', 'Uccle', 'Waterloo', 'Linkebeek', 'Ixelles', 'Woluwe', 'Braine-l’Alleud', 'Overijse', 'Bruxelles'],
 }
 
