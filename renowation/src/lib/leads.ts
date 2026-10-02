@@ -96,6 +96,8 @@ export const eur = (n: number) =>
  * Accès cockpit : avec Supabase, connexion email/mot de passe (RLS « authenticated ») ;
  * en mode local, simple code PIN (VITE_COCKPIT_PIN, défaut 2026) — démo uniquement.
  */
+let pinSession = false
+
 export const authMode: 'supabase' | 'pin' = supabase ? 'supabase' : 'pin'
 
 export async function signIn(login: string, secret: string): Promise<void> {
@@ -111,15 +113,25 @@ export async function signIn(login: string, secret: string): Promise<void> {
   }
   const pin = (import.meta.env.VITE_COCKPIT_PIN as string | undefined) || '2026'
   if (secret !== pin) throw new Error('Code incorrect')
-  sessionStorage.setItem('renowation.cockpit', '1')
+  try {
+    sessionStorage.setItem('renowation.cockpit', '1')
+  } catch {}
+  pinSession = true
 }
 
 export async function isSignedIn(): Promise<boolean> {
   if (supabase) return !!(await supabase.auth.getSession()).data.session
-  return sessionStorage.getItem('renowation.cockpit') === '1'
+  try {
+    return pinSession || sessionStorage.getItem('renowation.cockpit') === '1'
+  } catch {
+    return pinSession
+  }
 }
 
 export async function signOut() {
   if (supabase) await supabase.auth.signOut()
-  sessionStorage.removeItem('renowation.cockpit')
+  pinSession = false
+  try {
+    sessionStorage.removeItem('renowation.cockpit')
+  } catch {}
 }
