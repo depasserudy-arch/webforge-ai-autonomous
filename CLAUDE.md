@@ -7,4 +7,4 @@
 
 ## Contexte
 - Dépôt des plateformes clients générées par ALSA Consulting (modèle : commission de 10 % sur l'encaissé).
-- `renowation/` : plateforme Renowation (Vite + React + Supabase) — voir `renowation/README.md`.
+- `renowation/` : ARCHIVE. La plateforme officielle de Renowation (Soignies) est le dépôt `depasserudy-arch/renowation` (renowation.vercel.app). Ne rien déployer depuis ce dossier.

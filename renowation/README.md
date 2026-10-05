@@ -1,4 +1,8 @@
-# Renowation — Plateforme ALSA
+# Renowation — Plateforme ALSA (ARCHIVE)
+
+> **Archive, ne pas déployer.** La plateforme officielle de Renowation (Soignies) est le dépôt
+> `depasserudy-arch/renowation`, en ligne sur renowation.vercel.app, base Supabase `czimsuihasvxgdhdaiyc`.
+> Décision de Rudy du 05/10/2026, consignée dans le journal du cockpit ALSA.
 
 Site vitrine haut de gamme + tunnel de devis + cockpit commercial pour **Renowation**
 (rénovation, Rhode-Saint-Genèse / Bruxelles). Conçu par ALSA Consulting.
